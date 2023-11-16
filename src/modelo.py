@@ -125,3 +125,90 @@ state_rfm = state_rfm.merge(
     how='left'
 )
 state_rfm.to_feather('./dados/clusterizacao_estado.feather')
+
+##
+
+print('Regressão (Vendas) (com sazonalidades) por Estado e Região...')
+regressao_state_region = pd.DataFrame()
+primeiro = 0
+for index, row in data[['State', 'Region']].drop_duplicates().iterrows():
+    print(row['State'])
+    print(row['Region'])
+    if row['State'] != 'Wyoming':
+        regressao = data[
+            (data['State'] == row['State']) &
+            (data['Region'] == row['Region'])
+        ][['Order Date Month', 'Sales']
+        ].groupby('Order Date Month')['Sales'].sum().reset_index()
+        regressao = regressao.rename(columns={
+            'Order Date Month': 'ds', 'Sales': 'y'
+        })
+        print(regressao)
+        m = Prophet().fit(regressao)
+
+        future = m.make_future_dataframe(periods=12, freq='MS')
+        forecast = m.predict(future)
+        forecast['State'] = row['State']
+        forecast['Region'] = row['Region']
+        forecast = forecast.merge(regressao, on='ds', how='left')
+        forecast = forecast[
+            ['State', 'Region', 'ds', 'yhat', 'y', 'yhat_lower', 'yhat_upper']
+        ].copy()
+        if primeiro == 0:
+            regressao_state_region = forecast
+            primeiro = 1
+        else:
+            regressao_state_region = pd.concat(
+                [
+                    regressao_state_region,
+                    forecast
+                ]
+            )
+regressao_state_region = regressao_state_region.reset_index()
+regressao_state_region.to_feather('./dados/regressao_estado_regiao_vendas.feather')
+
+print('Regressão (Lucros) (com sazonalidades) por Estado e Região...')
+regressao_state_region = pd.DataFrame()
+primeiro = 0
+for index, row in data[['State', 'Region']].drop_duplicates().iterrows():
+    print(row['State'])
+    print(row['Region'])
+    if row['State'] != 'Wyoming':
+        regressao = data[
+            (data['State'] == row['State']) &
+            (data['Region'] == row['Region'])
+        ][['Order Date Month', 'Profit']
+        ].groupby('Order Date Month')['Profit'].sum().reset_index()
+        regressao = regressao.rename(columns={
+            'Order Date Month': 'ds', 'Profit': 'y'
+        })
+        print(regressao)
+        m = Prophet().fit(regressao)
+
+        future = m.make_future_dataframe(periods=12, freq='MS')
+        forecast = m.predict(future)
+        forecast['State'] = row['State']
+        forecast['Region'] = row['Region']
+        forecast = forecast.merge(regressao, on='ds', how='left')
+        forecast = forecast[
+            ['State', 'Region', 'ds', 'yhat', 'y', 'yhat_lower', 'yhat_upper']
+        ].copy()
+        if primeiro == 0:
+            regressao_state_region = forecast
+            primeiro = 1
+        else:
+            regressao_state_region = pd.concat(
+                [
+                    regressao_state_region,
+                    forecast
+                ]
+            )
+regressao_state_region = regressao_state_region.reset_index()
+regressao_state_region.to_feather('./dados/regressao_estado_regiao_lucros.feather')
+
+
+print('Detecção de Anomalias por Estado...')
+df_out = fit_data(data, 'State')
+out = df_out[variaveis].fillna(0).copy()
+outliers = outliers_detection(df_out, out)
+outliers.to_feather('./dados/outliers_estado.feather')

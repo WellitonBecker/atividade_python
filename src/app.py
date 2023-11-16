@@ -33,10 +33,22 @@ def load_database():
         pd.read_feather('./dados/probabilidade_estado.feather'), \
         pd.read_feather('./dados/classificacao_consumidor.feather'), \
         pd.read_feather('./dados/clusterizacao_estado.feather'), \
+        pd.read_feather('./dados/regressao_estado_regiao_vendas.feather'), \
+        pd.read_feather('./dados/regressao_estado_regiao_lucros.feather'), \
+        pd.read_feather('./dados/outliers_estado.feather'), \
         pd.read_feather('./dados/localizacao.feather')
 
 
-ss, knn_estado, prb_estado, cla_con, clu_pai, coordenadas = load_database()
+ss, knn_estado, prb_estado, cla_con, clu_pai, sta_reg_ven, sta_reg_luc, out_pai, coordenadas = load_database()
+
+sta_reg_ven = sta_reg_ven.copy()
+sta_reg_ven['ano'] = sta_reg_ven['ds'].dt.year
+sta_reg_ven['mes'] = sta_reg_ven['ds'].dt.month
+
+sta_reg_luc = sta_reg_luc.copy()
+sta_reg_luc['ano'] = sta_reg_luc['ds'].dt.year
+sta_reg_luc['mes'] = sta_reg_luc['ds'].dt.month
+
 
 ## Criação das opções com base em tabs
 taberp, tabbi, tabstore = st.tabs(['Sistema Interno', 'Gestão', 'E-Commerce'])
@@ -111,3 +123,37 @@ with taberp:
                   delta=clu_estado_cli['f_vendas'].values[0] - clu_estado_cli['clf_vendas'].values[0])
         c3.metric('Frequencia de Lucro', clu_estado_cli['f_lucro'].values[0],
                   delta=clu_estado_cli['f_lucro'].values[0] - clu_estado_cli['cls_lucro'].values[0])
+
+
+
+with tabbi:
+    st.header('Dados do Business Intelligence')
+    with st.expander('Vendas'):
+        agga = st.selectbox('Agregador ', ['sum', 'mean'])
+        st.dataframe(sta_reg_ven.pivot_table(index='Region', values=['y', 'yhat'], aggfunc=agga, fill_value=0))
+
+        if st.checkbox('Detalhar Região'):
+            regiao = st.selectbox('Região', sta_reg_ven['Region'].unique())
+            ano = st.selectbox('Ano', sta_reg_ven['ano'].unique(), key='vendas')
+            gr_ano = sta_reg_ven[
+                (sta_reg_ven['ano'] == ano) & (sta_reg_ven['Region'] == regiao)
+            ].groupby('mes')[['y', 'yhat']].sum().reset_index()
+            st.dataframe(gr_ano.pivot_table(index='mes',
+                values=['y', 'yhat'], aggfunc=agga, fill_value=0))
+
+    with st.expander('Lucros'):
+        aggm = st.selectbox('Agregador Estado', ['sum', 'mean'])
+        st.dataframe(sta_reg_luc.pivot_table(index='State', values=['y', 'yhat'], aggfunc=aggm, fill_value=0))
+
+        if st.checkbox('Detalhar Estado'):
+            estado = st.selectbox('Estado', sta_reg_luc['State'].unique())
+            anol = st.selectbox('Ano', sta_reg_luc['ano'].unique(), key='lucro')
+
+            gr_mer = sta_reg_luc[
+                (sta_reg_luc['ano'] == anol) & (sta_reg_luc['State'] == estado)
+            ].groupby(['mes'])[['y', 'yhat']].sum().reset_index()
+            st.dataframe(gr_mer.pivot_table(index='mes', values=['y', 'yhat'], aggfunc=aggm, fill_value=0))
+
+    with st.expander('RFM/Outliers'):
+        out_paises = st.multiselect('Paises:', ss_con['State'].unique())
+        st.dataframe(out_pai[out_pai['referencia'].isin(out_paises)])
