@@ -212,3 +212,54 @@ df_out = fit_data(data, 'State')
 out = df_out[variaveis].fillna(0).copy()
 outliers = outliers_detection(df_out, out)
 outliers.to_feather('./dados/outliers_estado.feather')
+
+##############
+
+print('Cálculo da associação por subcategoria')
+original = fit_data(data, 'Sub-Category')
+original = original.fillna(0)
+base = original[variaveis]
+vizinhos = NearestNeighbors(n_neighbors=min(4, len(base))).fit(base)
+similares = []
+for index, row in original.iterrows():
+    # print('Referencia: {0}'.format(row['referencia']))
+    original_referencia = original[
+        original['referencia'] == row['referencia']][variaveis]
+    similar = vizinhos.kneighbors(original_referencia, return_distance=False)[0]
+    original_similar = original.iloc[similar][variaveis].reset_index()
+    referencia = original.iloc[similar]['referencia'].reset_index()
+    referencia = referencia.merge(original_similar, on='index', how='left')
+    referencia = referencia.drop(columns=['index'])
+    for ind, rw in referencia.iterrows():
+        if row['referencia'] != rw['referencia']:
+            similares.insert(0, [row['referencia'], rw['referencia']])
+similares = pd.DataFrame(
+    similares,
+    columns = ['referencia', 'vizinho']
+)
+similares.to_feather('./dados/knn_subcategoria.feather')
+
+print('Cálculo da associação por produto')
+original = fit_data(data, 'Product Name')
+original = original.fillna(0)
+base = original[variaveis]
+vizinhos = NearestNeighbors(n_neighbors=min(4, len(base))).fit(base)
+similares = []
+for index, row in original.iterrows():
+    # print('Referencia: {0}'.format(row['referencia']))
+    original_referencia = original[
+        original['referencia'] == row['referencia']][variaveis]
+    similar = vizinhos.kneighbors(original_referencia, return_distance=False)[0]
+    original_similar = original.iloc[similar][variaveis].reset_index()
+    referencia = original.iloc[similar]['referencia'].reset_index()
+    referencia = referencia.merge(original_similar, on='index', how='left')
+    referencia = referencia.drop(columns=['index'])
+    for ind, rw in referencia.iterrows():
+        if row['referencia'] != rw['referencia']:
+            similares.insert(0, [row['referencia'], rw['referencia']])
+similares = pd.DataFrame(
+    similares,
+    columns = ['referencia', 'vizinho']
+)
+similares.to_feather('./dados/knn_produto.feather')
+

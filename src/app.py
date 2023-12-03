@@ -30,6 +30,8 @@ style_metric_cards(
 def load_database():
     return pd.read_feather('./dados/ss.feather'), \
         pd.read_feather('./dados/knn_estado.feather'), \
+        pd.read_feather('./dados/knn_subcategoria.feather'), \
+        pd.read_feather('./dados/knn_produto.feather'), \
         pd.read_feather('./dados/probabilidade_estado.feather'), \
         pd.read_feather('./dados/classificacao_consumidor.feather'), \
         pd.read_feather('./dados/clusterizacao_estado.feather'), \
@@ -39,7 +41,7 @@ def load_database():
         pd.read_feather('./dados/localizacao.feather')
 
 
-ss, knn_estado, prb_estado, cla_con, clu_pai, sta_reg_ven, sta_reg_luc, out_pai, coordenadas = load_database()
+ss, knn_estado, knn_sub, knn_pro, prb_estado, cla_con, clu_pai, sta_reg_ven, sta_reg_luc, out_pai, coordenadas = load_database()
 
 sta_reg_ven = sta_reg_ven.copy()
 sta_reg_ven['ano'] = sta_reg_ven['ds'].dt.year
@@ -157,3 +159,31 @@ with tabbi:
     with st.expander('RFM/Outliers'):
         out_paises = st.multiselect('Paises:', ss_con['State'].unique())
         st.dataframe(out_pai[out_pai['referencia'].isin(out_paises)])
+
+with tabstore:
+    st.header('Dados do Comércio Eletrônico')
+    consumidor = st.selectbox(
+        'Selecione o consumidor: ',
+        ss['Customer ID'].unique()
+    )
+    gs_cli = ss[ss['Customer ID'] == consumidor][[
+        'Product ID',
+        'Product Name',
+        'Sub-Category',
+        'Profit']
+    ].groupby(
+        ['Product ID', 'Product Name', 'Sub-Category']
+    )[['Profit']].sum().reset_index()
+    gs_cli_plus = gs_cli.sort_values(by='Profit', ascending=False)[0:5]
+    st.dataframe(gs_cli_plus[['Product Name', 'Sub-Category']])
+    col1, col2 = st.columns(2)
+    for subcategoria in gs_cli_plus['Sub-Category'].unique():
+        col1.header(subcategoria)
+        col1.subheader('Similares')
+        for idx, rw in knn_sub[knn_sub['referencia'] == subcategoria].iterrows():
+            col1.write(rw['vizinho'])
+    for index, row in gs_cli_plus.iterrows():
+        col2.header('{0}({1})'.format(row['Product Name'],row['Product ID']))
+        col2.subheader('Similares')
+        for idx, rw in knn_pro[knn_pro['referencia'] == row['Product Name']].iterrows():
+            col2.write(rw['vizinho'])
